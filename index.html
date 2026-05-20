@@ -389,7 +389,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-const UNITS = 20;
+const UNITS = 46;
 let state = { units: {}, log: [] };
 try { const s = localStorage.getItem('paradigm_storage_v4'); if (s) state = JSON.parse(s); } catch(e) {}
 function save() { try { localStorage.setItem('paradigm_storage_v4', JSON.stringify(state)); } catch(e) {} }
@@ -419,8 +419,8 @@ function switchTab(tab) {
 
 function onActionChange() {
   const action = document.getElementById('action').value;
-  document.getElementById('end-field').style.display = action === 'checkout' ? 'none' : '';
-  document.getElementById('booking-fields').style.display = '';
+  document.getElementById('end-field').style.display = action === 'checkout' || action === 'cancel' ? 'none' : '';
+  document.getElementById('booking-fields').style.display = action === 'checkout' || action === 'cancel' ? 'none' : '';
   checkAvailability();
 }
 
@@ -440,9 +440,30 @@ function checkAvailability() {
       banner.className = 'avail-banner taken';
       banner.innerHTML = '&#9888; Unit ' + unit + ' is already empty — nothing to check out.';
       banner.style.display = 'block'; detail.style.display = 'none'; btn.disabled = true;
+    } else if (u.status === 'booking') {
+      banner.className = 'avail-banner taken';
+      banner.innerHTML = '&#9888; Unit ' + unit + ' has an advance booking, not a check in. Use Cancel Booking instead.';
+      banner.style.display = 'block'; detail.style.display = 'none'; btn.disabled = true;
     } else {
       banner.className = 'avail-banner ok';
       banner.innerHTML = '&#10003; Unit ' + unit + ' is in use by <strong>' + u.customer + '</strong> — ready to check out.';
+      banner.style.display = 'block'; detail.style.display = 'none'; btn.disabled = false;
+    }
+    return;
+  }
+
+  if (action === 'cancel') {
+    if (!u) {
+      banner.className = 'avail-banner taken';
+      banner.innerHTML = '&#9888; Unit ' + unit + ' has no booking to cancel.';
+      banner.style.display = 'block'; detail.style.display = 'none'; btn.disabled = true;
+    } else if (u.status === 'checkin') {
+      banner.className = 'avail-banner taken';
+      banner.innerHTML = '&#9888; Unit ' + unit + ' is already checked in — use Check Out instead.';
+      banner.style.display = 'block'; detail.style.display = 'none'; btn.disabled = true;
+    } else {
+      banner.className = 'avail-banner ok';
+      banner.innerHTML = '&#10003; Advance booking for <strong>' + u.customer + '</strong> on Unit ' + unit + ' will be cancelled.';
       banner.style.display = 'block'; detail.style.display = 'none'; btn.disabled = false;
     }
     return;
@@ -484,19 +505,21 @@ function submitForm() {
   const u = state.units[unit];
   if ((action === 'checkin' || action === 'booking') && u) { toast('Unit ' + unit + ' is already taken — choose another.', 'error'); return; }
   if (action === 'checkout' && !u) { toast('Unit ' + unit + ' is already empty.', 'error'); return; }
+  if (action === 'cancel' && (!u || u.status !== 'booking')) { toast('No advance booking to cancel on Unit ' + unit + '.', 'error'); return; }
 
-  const checkoutCustomer = action === 'checkout' && u ? u.customer : customer;
-  const entry = { staff, unit: parseInt(unit), action, customer: checkoutCustomer, startDate, endDate, contents, timestamp: new Date().toISOString() };
+  const resolvedCustomer = (action === 'checkout' || action === 'cancel') && u ? u.customer : customer;
+  const entry = { staff, unit: parseInt(unit), action, customer: resolvedCustomer, startDate, endDate, contents, timestamp: new Date().toISOString() };
   state.log.unshift(entry);
 
   if (action === 'checkin' || action === 'booking') {
     state.units[unit] = { status: action, customer, staff, startDate, endDate, contents };
-  } else if (action === 'checkout') {
+  } else if (action === 'checkout' || action === 'cancel') {
     delete state.units[unit];
   }
 
   save();
-  toast(action === 'checkout' ? 'Unit ' + unit + ' checked out.' : 'Unit ' + unit + ' booked for ' + customer + '.', 'success');
+  const msg = action === 'checkout' ? 'Unit ' + unit + ' checked out.' : action === 'cancel' ? 'Booking for ' + resolvedCustomer + ' on Unit ' + unit + ' cancelled.' : 'Unit ' + unit + ' booked for ' + customer + '.';
+  toast(msg, 'success');
 
   document.getElementById('customer').value = '';
   document.getElementById('contents').value = '';
@@ -549,8 +572,8 @@ function renderLog() {
   if (!state.log.length) { list.innerHTML = '<div class="empty-state">No activity yet.</div>'; return; }
   list.innerHTML = state.log.slice(0, 50).map(e => {
     const d = new Date(e.timestamp).toLocaleDateString('en-GB', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
-    const bc = e.action === 'checkin' ? 'checkin' : e.action === 'checkout' ? 'checkout' : 'booking';
-    const bl = e.action === 'checkin' ? 'Check in' : e.action === 'checkout' ? 'Check out' : 'Booking';
+    const bc = e.action === 'checkin' ? 'checkin' : e.action === 'checkout' ? 'checkout' : e.action === 'cancel' ? 'checkout' : 'booking';
+    const bl = e.action === 'checkin' ? 'Check in' : e.action === 'checkout' ? 'Check out' : e.action === 'cancel' ? 'Cancelled' : 'Booking';
     return '<div class="log-row"><span class="badge ' + bc + '">' + bl + '</span><div class="log-detail"><strong>Unit ' + e.unit + '</strong> — ' + e.customer + (e.contents ? ' (' + e.contents + ')' : '') + '<div class="log-meta">' + e.staff + ' &middot; ' + d + '</div></div></div>';
   }).join('');
 }
