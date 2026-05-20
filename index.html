@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paradigm Storage Booking</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: #fff;
+      border-bottom: 1px solid #e5e5e5;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-title { font-size: 16px; font-weight: 600; color: #1a1a1a; }
+    .header-sub { font-size: 12px; color: #888; margin-top: 1px; }
+    .header-date { font-size: 12px; color: #888; }
+
+    .tabs {
+      display: flex;
+      background: #fff;
+      border-bottom: 1px solid #e5e5e5;
+      overflow-x: auto;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 12px 8px;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: #888;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      min-width: 90px;
+    }
+
+    .tab.active { color: #1a1a1a; border-bottom-color: #1a1a1a; }
+    .tab i { display: block; font-size: 18px; margin-bottom: 2px; }
+
+    .content { padding: 1rem; max-width: 600px; margin: 0 auto; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e5e5e5;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .field { margin-bottom: 1rem; }
+    .field:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      color: #1a1a1a;
+      background: #fff;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    input:focus, select:focus { outline: none; border-color: #1a1a1a; }
+
+    .btn {
+      width: 100%;
+      padding: 13px;
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.75rem;
+      letter-spacing: 0.01em;
+    }
+
+    .btn:hover { background: #333; }
+    .btn:disabled { background: #ccc; cursor: not-allowed; }
+
+    .avail-banner {
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 1rem;
+      display: none;
+      line-height: 1.5;
+    }
+
+    .avail-banner.ok { background: #eaf3de; color: #2d5a0e; }
+    .avail-banner.taken { background: #fdecea; color: #8b2020; }
+
+    .unit-detail-box {
+      background: #f9f9f9;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 1rem;
+      display: none;
+      color: #444;
+      line-height: 1.7;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 1rem;
+    }
+
+    .metric {
+      background: #f9f9f9;
+      border-radius: 10px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .metric .label { font-size: 12px; color: #888; margin-bottom: 4px; }
+    .metric .value { font-size: 28px; font-weight: 700; }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 0.75rem;
+      font-size: 12px;
+      color: #666;
+      flex-wrap: wrap;
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+    .unit-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-bottom: 1rem;
+    }
+
+    .unit-cell {
+      border-radius: 8px;
+      padding: 8px 4px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid #e5e5e5;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .unit-cell.empty { background: #f5f5f5; color: #999; }
+    .unit-cell.occupied { background: #fdecea; color: #8b2020; border-color: #f5a5a5; }
+    .unit-cell.booked { background: #fff8e6; color: #7a4f00; border-color: #f5d070; }
+    .unit-label { font-size: 9px; display: block; margin-top: 2px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .unit-info-card {
+      background: #f9f9f9;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      font-size: 13px;
+      color: #444;
+      line-height: 1.7;
+      display: none;
+    }
+
+    .section-title { font-size: 13px; font-weight: 600; color: #888; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .log-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 13px;
+    }
+
+    .log-row:last-child { border-bottom: none; }
+
+    .badge {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .badge.checkin { background: #eaf3de; color: #2d5a0e; }
+    .badge.checkout { background: #fdecea; color: #8b2020; }
+    .badge.booking { background: #fff8e6; color: #7a4f00; }
+
+    .log-detail { flex: 1; line-height: 1.5; }
+    .log-detail strong { color: #1a1a1a; }
+    .log-meta { font-size: 11px; color: #999; }
+
+    .empty-state { text-align: center; padding: 2.5rem 1rem; color: #aaa; font-size: 14px; }
+
+    .export-btn {
+      font-size: 12px;
+      padding: 5px 12px;
+      cursor: pointer;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      background: none;
+      color: #666;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 11px 22px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 999;
+      display: none;
+      white-space: nowrap;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+
+    .toast.success { background: #2d5a0e; color: #fff; }
+    .toast.error { background: #8b2020; color: #fff; }
+
+    canvas { max-width: 100%; }
+
+    @media (min-width: 480px) {
+      .metric-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">Paradigm Storage</div>
+    <div class="header-sub">Paradigm Reinstatements</div>
+  </div>
+  <div class="header-date" id="live-date"></div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('book')">
+    <i class="ti ti-calendar"></i> Book
+  </button>
+  <button class="tab" onclick="switchTab('dashboard')">
+    <i class="ti ti-layout-grid"></i> Dashboard
+  </button>
+  <button class="tab" onclick="switchTab('log')">
+    <i class="ti ti-list"></i> Log
+  </button>
+</div>
+
+<div class="content">
+
+  <!-- BOOK TAB -->
+  <div id="tab-book">
+    <div class="card">
+      <div class="field">
+        <label>Your name</label>
+        <input type="text" id="staff" placeholder="Type your name..." />
+      </div>
+      <div class="field">
+        <label>Action</label>
+        <select id="action" onchange="onActionChange()">
+          <option value="">Select action...</option>
+          <option value="booking">Advance booking</option>
+          <option value="checkin">Check in</option>
+          <option value="checkout">Check out</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Storage unit</label>
+        <select id="unit" onchange="checkAvailability()">
+          <option value="">Select unit...</option>
+        </select>
+      </div>
+
+      <div class="avail-banner" id="avail-banner"></div>
+      <div class="unit-detail-box" id="unit-detail"></div>
+
+      <div id="booking-fields">
+        <div class="field">
+          <label>Customer name</label>
+          <input type="text" id="customer" placeholder="e.g. Smith" />
+        </div>
+        <div class="field">
+          <label>Start date</label>
+          <input type="date" id="start-date" />
+        </div>
+        <div class="field" id="end-field">
+          <label>Estimated end date</label>
+          <input type="date" id="end-date" />
+        </div>
+        <div class="field">
+          <label>Description of contents <span style="color:#aaa;font-weight:400;">(optional)</span></label>
+          <input type="text" id="contents" placeholder="e.g. Living room furniture" />
+        </div>
+      </div>
+      <button class="btn" id="submit-btn" onclick="submitForm()">Submit</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD TAB -->
+  <div id="tab-dashboard" style="display:none;">
+    <div class="metric-grid">
+      <div class="metric">
+        <div class="label">Occupied</div>
+        <div class="value" id="m-occupied" style="color:#8b2020;">0</div>
+      </div>
+      <div class="metric">
+        <div class="label">Booked ahead</div>
+        <div class="value" id="m-booked" style="color:#7a4f00;">0</div>
+      </div>
+      <div class="metric">
+        <div class="label">Available</div>
+        <div class="value" id="m-free" style="color:#2d5a0e;">20</div>
+      </div>
+      <div class="metric">
+        <div class="label">Utilisation</div>
+        <div class="value" id="m-util">0%</div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#f5a5a5;"></div> Occupied</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f5d070;"></div> Advance booking</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#e0e0e0;"></div> Empty</div>
+    </div>
+
+    <div style="font-size:12px; color:#aaa; margin-bottom:0.5rem;">Tap a unit to see details</div>
+    <div class="unit-grid" id="unit-grid"></div>
+    <div class="unit-info-card" id="unit-info-card"></div>
+
+    <div class="card">
+      <div class="section-title">Monthly check-ins</div>
+      <canvas id="monthly-chart"></canvas>
+    </div>
+  </div>
+
+  <!-- LOG TAB -->
+  <div id="tab-log" style="display:none;">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <div class="section-title" style="margin:0;">Activity log</div>
+        <button class="export-btn" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</button>
+      </div>
+      <div id="log-list"><div class="empty-state">No activity yet.</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const UNITS = 20;
+let state = { units: {}, log: [] };
+try { const s = localStorage.getItem('paradigm_storage_v4'); if (s) state = JSON.parse(s); } catch(e) {}
+function save() { try { localStorage.setItem('paradigm_storage_v4', JSON.stringify(state)); } catch(e) {} }
+
+function init() {
+  const unitSel = document.getElementById('unit');
+  for (let i = 1; i <= UNITS; i++) {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = 'Unit ' + i;
+    unitSel.appendChild(o);
+  }
+  document.getElementById('start-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('live-date').textContent = new Date().toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'});
+  renderGrid(); renderLog(); renderMetrics();
+}
+
+function switchTab(tab) {
+  ['book','dashboard','log'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach((btn, i) => {
+    btn.classList.toggle('active', ['book','dashboard','log'][i] === tab);
+  });
+  if (tab === 'dashboard') { renderGrid(); renderMetrics(); renderChart(); }
+  if (tab === 'log') renderLog();
+}
+
+function onActionChange() {
+  const action = document.getElementById('action').value;
+  document.getElementById('end-field').style.display = action === 'checkout' ? 'none' : '';
+  document.getElementById('booking-fields').style.display = '';
+  checkAvailability();
+}
+
+function checkAvailability() {
+  const unit = document.getElementById('unit').value;
+  const action = document.getElementById('action').value;
+  const banner = document.getElementById('avail-banner');
+  const detail = document.getElementById('unit-detail');
+  const btn = document.getElementById('submit-btn');
+
+  if (!unit || !action) { banner.style.display = 'none'; detail.style.display = 'none'; btn.disabled = false; return; }
+
+  const u = state.units[unit];
+
+  if (action === 'checkout') {
+    if (!u) {
+      banner.className = 'avail-banner taken';
+      banner.innerHTML = '&#9888; Unit ' + unit + ' is already empty — nothing to check out.';
+      banner.style.display = 'block'; detail.style.display = 'none'; btn.disabled = true;
+    } else {
+      banner.className = 'avail-banner ok';
+      banner.innerHTML = '&#10003; Unit ' + unit + ' is in use by <strong>' + u.customer + '</strong> — ready to check out.';
+      banner.style.display = 'block'; detail.style.display = 'none'; btn.disabled = false;
+    }
+    return;
+  }
+
+  if (u) {
+    const statusLabel = u.status === 'booking' ? 'advance booking' : 'checked in';
+    banner.className = 'avail-banner taken';
+    banner.innerHTML = '&#9888; <strong>Unit ' + unit + ' is not available</strong> — already ' + statusLabel + ' for ' + u.customer + '.';
+    banner.style.display = 'block';
+    detail.innerHTML = '<strong>Customer:</strong> ' + u.customer + '<br><strong>Staff:</strong> ' + u.staff + '<br><strong>From:</strong> ' + (u.startDate || '—') + '<br><strong>Est. end:</strong> ' + (u.endDate || '—') + (u.contents ? '<br><strong>Contents:</strong> ' + u.contents : '');
+    detail.style.display = 'block';
+    btn.disabled = true;
+  } else {
+    banner.className = 'avail-banner ok';
+    banner.innerHTML = '&#10003; Unit ' + unit + ' is available.';
+    banner.style.display = 'block'; detail.style.display = 'none'; btn.disabled = false;
+  }
+}
+
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + (type || 'success'); t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3500);
+}
+
+function submitForm() {
+  const staff = document.getElementById('staff').value.trim();
+  const unit = document.getElementById('unit').value;
+  const action = document.getElementById('action').value;
+  const customer = document.getElementById('customer').value.trim();
+  const startDate = document.getElementById('start-date').value;
+  const endDate = document.getElementById('end-date').value;
+  const contents = document.getElementById('contents').value.trim();
+
+  if (!staff || !unit || !action) { toast('Please fill in all required fields.', 'error'); return; }
+  if (action !== 'checkout' && !customer) { toast('Please enter the customer name.', 'error'); return; }
+
+  const u = state.units[unit];
+  if ((action === 'checkin' || action === 'booking') && u) { toast('Unit ' + unit + ' is already taken — choose another.', 'error'); return; }
+  if (action === 'checkout' && !u) { toast('Unit ' + unit + ' is already empty.', 'error'); return; }
+
+  const checkoutCustomer = action === 'checkout' && u ? u.customer : customer;
+  const entry = { staff, unit: parseInt(unit), action, customer: checkoutCustomer, startDate, endDate, contents, timestamp: new Date().toISOString() };
+  state.log.unshift(entry);
+
+  if (action === 'checkin' || action === 'booking') {
+    state.units[unit] = { status: action, customer, staff, startDate, endDate, contents };
+  } else if (action === 'checkout') {
+    delete state.units[unit];
+  }
+
+  save();
+  toast(action === 'checkout' ? 'Unit ' + unit + ' checked out.' : 'Unit ' + unit + ' booked for ' + customer + '.', 'success');
+
+  document.getElementById('customer').value = '';
+  document.getElementById('contents').value = '';
+  document.getElementById('action').value = '';
+  document.getElementById('unit').value = '';
+  document.getElementById('avail-banner').style.display = 'none';
+  document.getElementById('unit-detail').style.display = 'none';
+  document.getElementById('submit-btn').disabled = false;
+  renderGrid(); renderMetrics();
+}
+
+function renderGrid() {
+  const grid = document.getElementById('unit-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (let i = 1; i <= UNITS; i++) {
+    const u = state.units[i];
+    const div = document.createElement('div');
+    div.className = 'unit-cell ' + (u ? (u.status === 'booking' ? 'booked' : 'occupied') : 'empty');
+    div.innerHTML = '<div>Unit ' + i + '</div><span class="unit-label">' + (u ? u.customer : 'empty') + '</span>';
+    div.onclick = () => showUnitInfo(i);
+    grid.appendChild(div);
+  }
+}
+
+function showUnitInfo(i) {
+  const u = state.units[i];
+  const card = document.getElementById('unit-info-card');
+  if (!u) {
+    card.innerHTML = '<strong>Unit ' + i + '</strong> — <span style="color:#aaa;">Empty and available</span>';
+  } else {
+    const s = u.status === 'booking' ? 'Advance booking' : 'Checked in';
+    card.innerHTML = '<strong>Unit ' + i + ' — ' + s + '</strong><br>Customer: ' + u.customer + '<br>Staff: ' + u.staff + (u.startDate ? '<br>From: ' + u.startDate : '') + (u.endDate ? '<br>Est. end: ' + u.endDate : '') + (u.contents ? '<br>Contents: ' + u.contents : '');
+  }
+  card.style.display = 'block';
+}
+
+function renderMetrics() {
+  let occupied = 0, booked = 0;
+  Object.values(state.units).forEach(u => { if (u.status === 'checkin') occupied++; else if (u.status === 'booking') booked++; });
+  const free = UNITS - occupied - booked;
+  document.getElementById('m-occupied').textContent = occupied;
+  document.getElementById('m-booked').textContent = booked;
+  document.getElementById('m-free').textContent = free;
+  document.getElementById('m-util').textContent = Math.round((occupied / UNITS) * 100) + '%';
+}
+
+function renderLog() {
+  const list = document.getElementById('log-list');
+  if (!state.log.length) { list.innerHTML = '<div class="empty-state">No activity yet.</div>'; return; }
+  list.innerHTML = state.log.slice(0, 50).map(e => {
+    const d = new Date(e.timestamp).toLocaleDateString('en-GB', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+    const bc = e.action === 'checkin' ? 'checkin' : e.action === 'checkout' ? 'checkout' : 'booking';
+    const bl = e.action === 'checkin' ? 'Check in' : e.action === 'checkout' ? 'Check out' : 'Booking';
+    return '<div class="log-row"><span class="badge ' + bc + '">' + bl + '</span><div class="log-detail"><strong>Unit ' + e.unit + '</strong> — ' + e.customer + (e.contents ? ' (' + e.contents + ')' : '') + '<div class="log-meta">' + e.staff + ' &middot; ' + d + '</div></div></div>';
+  }).join('');
+}
+
+function exportCSV() {
+  const headers = ['Date','Time','Staff','Unit','Action','Customer','Start Date','End Date','Contents'];
+  const rows = state.log.map(e => {
+    const al = e.action === 'checkin' ? 'Check In' : e.action === 'checkout' ? 'Check Out' : 'Advance Booking';
+    return [new Date(e.timestamp).toLocaleDateString('en-GB'), new Date(e.timestamp).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), e.staff,'Unit '+e.unit,al,e.customer,e.startDate,e.endDate||'',e.contents||''].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',');
+  });
+  const csv = [headers.join(','),...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download = 'paradigm-storage-'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
+  toast('CSV downloaded.','success');
+}
+
+let chartInst = null;
+function renderChart() {
+  const months = [], counts = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push(d.toLocaleDateString('en-GB',{month:'short'}));
+    const mStr = d.toISOString().slice(0,7);
+    counts.push(state.log.filter(e=>e.timestamp&&e.timestamp.startsWith(mStr)&&e.action==='checkin').length);
+  }
+  const canvas = document.getElementById('monthly-chart');
+  if (chartInst) chartInst.destroy();
+  chartInst = new Chart(canvas, {
+    type:'bar',
+    data:{labels:months,datasets:[{label:'Check-ins',data:counts,backgroundColor:'#b5d4f4',borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+}
+
+init();
+</script>
+</body>
+</html>
