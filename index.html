@@ -320,7 +320,7 @@
         </div>
         <div class="field">
           <label>Start date</label>
-          <input type="date" id="start-date" />
+          <input type="date" id="start-date" onchange="checkAvailability()" />
         </div>
         <div class="field" id="end-field">
           <label>Estimated end date</label>
@@ -424,9 +424,15 @@ function onActionChange() {
   checkAvailability();
 }
 
+function datesOverlap(existingEnd, newStart) {
+  if (!existingEnd || !newStart) return true;
+  return new Date(newStart) <= new Date(existingEnd);
+}
+
 function checkAvailability() {
   const unit = document.getElementById('unit').value;
   const action = document.getElementById('action').value;
+  const newStart = document.getElementById('start-date').value;
   const banner = document.getElementById('avail-banner');
   const detail = document.getElementById('unit-detail');
   const btn = document.getElementById('submit-btn');
@@ -470,13 +476,30 @@ function checkAvailability() {
   }
 
   if (u) {
-    const statusLabel = u.status === 'booking' ? 'advance booking' : 'checked in';
-    banner.className = 'avail-banner taken';
-    banner.innerHTML = '&#9888; <strong>Unit ' + unit + ' is not available</strong> — already ' + statusLabel + ' for ' + u.customer + '.';
-    banner.style.display = 'block';
-    detail.innerHTML = '<strong>Customer:</strong> ' + u.customer + '<br><strong>Staff:</strong> ' + u.staff + '<br><strong>From:</strong> ' + (u.startDate || '—') + '<br><strong>Est. end:</strong> ' + (u.endDate || '—') + (u.contents ? '<br><strong>Contents:</strong> ' + u.contents : '');
-    detail.style.display = 'block';
-    btn.disabled = true;
+    if (u.status === 'checkin') {
+      banner.className = 'avail-banner taken';
+      banner.innerHTML = '&#9888; <strong>Unit ' + unit + ' is currently checked in</strong> — occupied by ' + u.customer + '. Must be checked out first.';
+      banner.style.display = 'block';
+      detail.innerHTML = '<strong>Customer:</strong> ' + u.customer + '<br><strong>Staff:</strong> ' + u.staff + '<br><strong>From:</strong> ' + (u.startDate || '—') + (u.contents ? '<br><strong>Contents:</strong> ' + u.contents : '');
+      detail.style.display = 'block';
+      btn.disabled = true;
+    } else if (u.status === 'booking') {
+      const overlaps = datesOverlap(u.endDate, newStart);
+      if (overlaps) {
+        banner.className = 'avail-banner taken';
+        banner.innerHTML = '&#9888; <strong>Unit ' + unit + ' is already booked</strong> for ' + u.customer + ' until ' + (u.endDate || 'unknown') + '. Your start date overlaps.';
+        banner.style.display = 'block';
+        detail.innerHTML = '<strong>Customer:</strong> ' + u.customer + '<br><strong>From:</strong> ' + (u.startDate || '—') + '<br><strong>Est. end:</strong> ' + (u.endDate || '—') + (u.contents ? '<br><strong>Contents:</strong> ' + u.contents : '');
+        detail.style.display = 'block';
+        btn.disabled = true;
+      } else {
+        banner.className = 'avail-banner ok';
+        banner.innerHTML = '&#10003; Unit ' + unit + ' has an existing booking until ' + u.endDate + ' but your start date is after that — available to book.';
+        banner.style.display = 'block';
+        detail.style.display = 'none';
+        btn.disabled = false;
+      }
+    }
   } else {
     banner.className = 'avail-banner ok';
     banner.innerHTML = '&#10003; Unit ' + unit + ' is available.';
@@ -503,7 +526,10 @@ function submitForm() {
   if (action !== 'checkout' && !customer) { toast('Please enter the customer name.', 'error'); return; }
 
   const u = state.units[unit];
-  if ((action === 'checkin' || action === 'booking') && u) { toast('Unit ' + unit + ' is already taken — choose another.', 'error'); return; }
+  if ((action === 'checkin' || action === 'booking') && u) {
+    if (u.status === 'checkin') { toast('Unit ' + unit + ' is checked in — must be checked out first.', 'error'); return; }
+    if (u.status === 'booking' && datesOverlap(u.endDate, startDate)) { toast('Unit ' + unit + ' booking overlaps — choose another unit or later start date.', 'error'); return; }
+  }
   if (action === 'checkout' && !u) { toast('Unit ' + unit + ' is already empty.', 'error'); return; }
   if (action === 'cancel' && (!u || u.status !== 'booking')) { toast('No advance booking to cancel on Unit ' + unit + '.', 'error'); return; }
 
