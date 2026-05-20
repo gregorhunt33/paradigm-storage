@@ -330,6 +330,13 @@
           <label>Description of contents <span style="color:#aaa;font-weight:400;">(optional)</span></label>
           <input type="text" id="contents" placeholder="e.g. Living room furniture" />
         </div>
+        <div class="field">
+          <label>Photo of contents <span style="color:#aaa;font-weight:400;">(optional)</span></label>
+          <input type="file" id="photo" accept="image/*" capture="environment" onchange="previewPhoto()" style="width:100%; padding:8px 0; font-size:14px;" />
+          <div id="photo-preview" style="display:none; margin-top:8px;">
+            <img id="photo-img" style="width:100%; border-radius:8px; border:1px solid #ddd; max-height:200px; object-fit:cover;" />
+          </div>
+        </div>
       </div>
       <button class="btn" id="submit-btn" onclick="submitForm()">Submit</button>
     </div>
@@ -398,6 +405,17 @@ const UNITS = 46;
 let state = { units: {}, log: [] };
 try { const s = localStorage.getItem('paradigm_storage_v4'); if (s) state = JSON.parse(s); } catch(e) {}
 function save() { try { localStorage.setItem('paradigm_storage_v4', JSON.stringify(state)); } catch(e) {} }
+
+function previewPhoto() {
+  const file = document.getElementById('photo').files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('photo-img').src = e.target.result;
+    document.getElementById('photo-preview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
 
 function init() {
   const unitSel = document.getElementById('unit');
@@ -539,27 +557,38 @@ function submitForm() {
   if (action === 'cancel' && (!u || u.status !== 'booking')) { toast('No advance booking to cancel on Unit ' + unit + '.', 'error'); return; }
 
   const resolvedCustomer = (action === 'checkout' || action === 'cancel') && u ? u.customer : customer;
-  const entry = { staff, unit: parseInt(unit), action, customer: resolvedCustomer, startDate, endDate, contents, timestamp: new Date().toISOString() };
-  state.log.unshift(entry);
-
-  if (action === 'checkin' || action === 'booking') {
-    state.units[unit] = { status: action, customer, staff, startDate, endDate, contents };
-  } else if (action === 'checkout' || action === 'cancel') {
-    delete state.units[unit];
+  const photoFile = document.getElementById('photo') ? document.getElementById('photo').files[0] : null;
+  let photoData = '';
+  const saveEntry = (photo) => {
+    const entry = { staff, unit: parseInt(unit), action, customer: resolvedCustomer, startDate, endDate, contents, photo: photo || '', timestamp: new Date().toISOString() };
+    state.log.unshift(entry);
+    if (action === 'checkin' || action === 'booking') {
+      state.units[unit] = { status: action, customer, staff, startDate, endDate, contents, photo: photo || '' };
+    } else if (action === 'checkout' || action === 'cancel') {
+      delete state.units[unit];
+    }
+    save();
+    const msg = action === 'checkout' ? 'Unit ' + unit + ' checked out.' : action === 'cancel' ? 'Booking for ' + resolvedCustomer + ' on Unit ' + unit + ' cancelled.' : 'Unit ' + unit + ' booked for ' + customer + '.';
+    toast(msg, 'success');
+    document.getElementById('customer').value = '';
+    document.getElementById('contents').value = '';
+    document.getElementById('action').value = '';
+    document.getElementById('unit').value = '';
+    if (document.getElementById('photo')) { document.getElementById('photo').value = ''; document.getElementById('photo-preview').style.display = 'none'; }
+    document.getElementById('avail-banner').style.display = 'none';
+    document.getElementById('unit-detail').style.display = 'none';
+    document.getElementById('submit-btn').disabled = false;
+    renderGrid(); renderMetrics();
+  };
+  if (photoFile) {
+    const reader = new FileReader();
+    reader.onload = (e) => saveEntry(e.target.result);
+    reader.readAsDataURL(photoFile);
+    return;
   }
-
-  save();
-  const msg = action === 'checkout' ? 'Unit ' + unit + ' checked out.' : action === 'cancel' ? 'Booking for ' + resolvedCustomer + ' on Unit ' + unit + ' cancelled.' : 'Unit ' + unit + ' booked for ' + customer + '.';
-  toast(msg, 'success');
-
-  document.getElementById('customer').value = '';
-  document.getElementById('contents').value = '';
-  document.getElementById('action').value = '';
-  document.getElementById('unit').value = '';
-  document.getElementById('avail-banner').style.display = 'none';
-  document.getElementById('unit-detail').style.display = 'none';
-  document.getElementById('submit-btn').disabled = false;
-  renderGrid(); renderMetrics();
+  saveEntry('');
+  return;
+  const entry = { staff, unit: parseInt(unit), action, customer: resolvedCustomer, startDate, endDate, contents, timestamp: new Date().toISOString() };
 }
 
 function searchCustomer() {
@@ -623,12 +652,32 @@ function showUnitInfo(i) {
     card.innerHTML = '<strong>Unit ' + i + '</strong> — <span style="color:#aaa;">Empty and available</span>';
   } else {
     const s = u.status === 'booking' ? 'Advance booking' : 'Checked in';
-    const cancelBtn = u.status === 'booking'
-      ? '<button onclick="cancelFromDashboard(' + i + ')" style="margin-top:12px; width:100%; padding:10px; background:#8b2020; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Cancel booking</button>'
-      : '<button onclick="checkoutFromDashboard(' + i + ')" style="margin-top:12px; width:100%; padding:10px; background:#1a1a1a; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Check out</button>';
-    card.innerHTML = '<strong>Unit ' + i + ' — ' + s + '</strong><br>Customer: ' + u.customer + '<br>Staff: ' + u.staff + (u.startDate ? '<br>From: ' + u.startDate : '') + (u.endDate ? '<br>Est. end: ' + u.endDate : '') + (u.contents ? '<br>Contents: ' + u.contents : '') + cancelBtn;
+    const photoHtml = u.photo ? '<img src="' + u.photo + '" style="width:100%; border-radius:8px; margin-top:10px; max-height:180px; object-fit:cover;" />' : '';
+    const actionBtn = u.status === 'booking'
+      ? '<button onclick="cancelFromDashboard(' + i + ')" style="margin-top:10px; width:100%; padding:10px; background:#8b2020; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Cancel booking</button>'
+      : '<button onclick="checkoutFromDashboard(' + i + ')" style="margin-top:10px; width:100%; padding:10px; background:#1a1a1a; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Check out</button>';
+    const extendHtml = '<div style="margin-top:10px; display:flex; gap:8px; align-items:center;">' +
+      '<input type="date" id="extend-date-' + i + '" style="flex:1; padding:8px 10px; border:1px solid #ddd; border-radius:8px; font-size:14px;" value="' + (u.endDate || '') + '" />' +
+      '<button onclick="extendBooking(' + i + ')" style="padding:8px 14px; background:#2d5a0e; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;">Extend date</button>' +
+      '</div>';
+    card.innerHTML = '<strong>Unit ' + i + ' — ' + s + '</strong><br>Customer: ' + u.customer + '<br>Staff: ' + u.staff + (u.startDate ? '<br>From: ' + u.startDate : '') + (u.endDate ? '<br>Est. end: ' + u.endDate : '') + (u.contents ? '<br>Contents: ' + u.contents : '') + photoHtml + extendHtml + actionBtn;
   }
   card.style.display = 'block';
+}
+
+function extendBooking(i) {
+  const u = state.units[i];
+  if (!u) return;
+  const newDate = document.getElementById('extend-date-' + i).value;
+  if (!newDate) { toast('Please select a new end date.', 'error'); return; }
+  if (newDate <= (u.endDate || '')) { toast('New date must be after the current end date.', 'error'); return; }
+  const oldDate = u.endDate || 'none';
+  state.units[i].endDate = newDate;
+  const entry = { staff: u.staff, unit: i, action: 'extend', customer: u.customer, startDate: u.startDate, endDate: newDate, contents: u.contents, timestamp: new Date().toISOString() };
+  state.log.unshift(entry);
+  save();
+  toast('Unit ' + i + ' extended to ' + newDate + '.', 'success');
+  showUnitInfo(i);
 }
 
 function cancelFromDashboard(i) {
@@ -672,8 +721,8 @@ function renderLog() {
   if (!state.log.length) { list.innerHTML = '<div class="empty-state">No activity yet.</div>'; return; }
   list.innerHTML = state.log.slice(0, 50).map(e => {
     const d = new Date(e.timestamp).toLocaleDateString('en-GB', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
-    const bc = e.action === 'checkin' ? 'checkin' : e.action === 'checkout' ? 'checkout' : e.action === 'cancel' ? 'checkout' : 'booking';
-    const bl = e.action === 'checkin' ? 'Check in' : e.action === 'checkout' ? 'Check out' : e.action === 'cancel' ? 'Cancelled' : 'Booking';
+    const bc = e.action === 'checkin' ? 'checkin' : e.action === 'checkout' ? 'checkout' : e.action === 'cancel' ? 'checkout' : e.action === 'extend' ? 'checkin' : 'booking';
+    const bl = e.action === 'checkin' ? 'Check in' : e.action === 'checkout' ? 'Check out' : e.action === 'cancel' ? 'Cancelled' : e.action === 'extend' ? 'Extended' : 'Booking';
     return '<div class="log-row"><span class="badge ' + bc + '">' + bl + '</span><div class="log-detail"><strong>Unit ' + e.unit + '</strong> — ' + e.customer + (e.contents ? ' (' + e.contents + ')' : '') + '<div class="log-meta">' + e.staff + ' &middot; ' + d + '</div></div></div>';
   }).join('');
 }
