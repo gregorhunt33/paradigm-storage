@@ -362,6 +362,11 @@
       <div class="legend-item"><div class="legend-dot" style="background:#e0e0e0;"></div> Empty</div>
     </div>
 
+    <div style="margin-bottom:1rem; position:relative;">
+      <input type="text" id="customer-search" placeholder="Search customer name..." oninput="searchCustomer()" style="width:100%; padding:10px 12px 10px 36px; border:1px solid #ddd; border-radius:8px; font-size:15px;" />
+      <i class="ti ti-search" style="position:absolute; left:11px; top:50%; transform:translateY(-50%); color:#aaa; font-size:16px;"></i>
+    </div>
+    <div id="search-result" style="display:none; background:#f9f9f9; border-radius:10px; padding:1rem; margin-bottom:1rem; font-size:13px; color:#444; line-height:1.7;"></div>
     <div style="font-size:12px; color:#aaa; margin-bottom:0.5rem;">Tap a unit to see details</div>
     <div class="unit-grid" id="unit-grid"></div>
     <div class="unit-info-card" id="unit-info-card"></div>
@@ -557,7 +562,43 @@ function submitForm() {
   renderGrid(); renderMetrics();
 }
 
-function renderGrid() {
+function searchCustomer() {
+  const query = document.getElementById('customer-search').value.trim().toLowerCase();
+  const result = document.getElementById('search-result');
+  if (!query) { result.style.display = 'none'; renderGrid(); return; }
+
+  const matches = [];
+  for (let i = 1; i <= UNITS; i++) {
+    const u = state.units[i];
+    if (u && u.customer.toLowerCase().includes(query)) {
+      matches.push({ unit: i, ...u });
+    }
+  }
+
+  if (matches.length === 0) {
+    result.innerHTML = '<span style="color:#aaa;">No customer found matching “' + query + '”</span>';
+    result.style.display = 'block';
+  } else {
+    result.innerHTML = matches.map(m => {
+      const s = m.status === 'booking' ? 'Advance booking' : 'Checked in';
+      const colour = m.status === 'booking' ? '#7a4f00' : '#8b2020';
+      return '<div style="margin-bottom:' + (matches.length > 1 ? '12px; padding-bottom:12px; border-bottom:1px solid #eee;' : '0;') + '">' +
+        '<strong style="color:' + colour + ';">Unit ' + m.unit + ' — ' + s + '</strong><br>' +
+        'Customer: ' + m.customer + '<br>' +
+        'Staff: ' + m.staff +
+        (m.startDate ? '<br>From: ' + m.startDate : '') +
+        (m.endDate ? '<br>Est. end: ' + m.endDate : '') +
+        (m.contents ? '<br>Contents: ' + m.contents : '') +
+        '</div>';
+    }).join('');
+    result.style.display = 'block';
+  }
+
+  // Highlight matching units on the grid
+  renderGrid(matches.map(m => m.unit));
+}
+
+function renderGrid(highlight) {
   const grid = document.getElementById('unit-grid');
   if (!grid) return;
   grid.innerHTML = '';
@@ -565,6 +606,10 @@ function renderGrid() {
     const u = state.units[i];
     const div = document.createElement('div');
     div.className = 'unit-cell ' + (u ? (u.status === 'booking' ? 'booked' : 'occupied') : 'empty');
+    if (highlight && highlight.length > 0) {
+      div.style.opacity = highlight.includes(i) ? '1' : '0.25';
+      if (highlight.includes(i)) div.style.outline = '2px solid #1a1a1a';
+    }
     div.innerHTML = '<div>Unit ' + i + '</div><span class="unit-label">' + (u ? u.customer : 'empty') + '</span>';
     div.onclick = () => showUnitInfo(i);
     grid.appendChild(div);
@@ -578,9 +623,38 @@ function showUnitInfo(i) {
     card.innerHTML = '<strong>Unit ' + i + '</strong> — <span style="color:#aaa;">Empty and available</span>';
   } else {
     const s = u.status === 'booking' ? 'Advance booking' : 'Checked in';
-    card.innerHTML = '<strong>Unit ' + i + ' — ' + s + '</strong><br>Customer: ' + u.customer + '<br>Staff: ' + u.staff + (u.startDate ? '<br>From: ' + u.startDate : '') + (u.endDate ? '<br>Est. end: ' + u.endDate : '') + (u.contents ? '<br>Contents: ' + u.contents : '');
+    const cancelBtn = u.status === 'booking'
+      ? '<button onclick="cancelFromDashboard(' + i + ')" style="margin-top:12px; width:100%; padding:10px; background:#8b2020; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Cancel booking</button>'
+      : '<button onclick="checkoutFromDashboard(' + i + ')" style="margin-top:12px; width:100%; padding:10px; background:#1a1a1a; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Check out</button>';
+    card.innerHTML = '<strong>Unit ' + i + ' — ' + s + '</strong><br>Customer: ' + u.customer + '<br>Staff: ' + u.staff + (u.startDate ? '<br>From: ' + u.startDate : '') + (u.endDate ? '<br>Est. end: ' + u.endDate : '') + (u.contents ? '<br>Contents: ' + u.contents : '') + cancelBtn;
   }
   card.style.display = 'block';
+}
+
+function cancelFromDashboard(i) {
+  const u = state.units[i];
+  if (!u || u.status !== 'booking') { return; }
+  if (!confirm('Cancel booking for ' + u.customer + ' on Unit ' + i + '?')) return;
+  const entry = { staff: u.staff, unit: i, action: 'cancel', customer: u.customer, startDate: u.startDate, endDate: u.endDate, contents: u.contents, timestamp: new Date().toISOString() };
+  state.log.unshift(entry);
+  delete state.units[i];
+  save();
+  document.getElementById('unit-info-card').style.display = 'none';
+  renderGrid(); renderMetrics();
+  toast('Booking for ' + entry.customer + ' on Unit ' + i + ' cancelled.', 'success');
+}
+
+function checkoutFromDashboard(i) {
+  const u = state.units[i];
+  if (!u || u.status !== 'checkin') { return; }
+  if (!confirm('Check out ' + u.customer + ' from Unit ' + i + '?')) return;
+  const entry = { staff: u.staff, unit: i, action: 'checkout', customer: u.customer, startDate: u.startDate, endDate: u.endDate, contents: u.contents, timestamp: new Date().toISOString() };
+  state.log.unshift(entry);
+  delete state.units[i];
+  save();
+  document.getElementById('unit-info-card').style.display = 'none';
+  renderGrid(); renderMetrics();
+  toast('Unit ' + i + ' checked out.', 'success');
 }
 
 function renderMetrics() {
