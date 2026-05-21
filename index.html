@@ -374,6 +374,7 @@
       <i class="ti ti-search" style="position:absolute; left:11px; top:50%; transform:translateY(-50%); color:#aaa; font-size:16px;"></i>
     </div>
     <div id="search-result" style="display:none; background:#f9f9f9; border-radius:10px; padding:1rem; margin-bottom:1rem; font-size:13px; color:#444; line-height:1.7;"></div>
+    <div id="alerts-container" style="margin-bottom:1rem; display:none;"></div>
     <div style="font-size:12px; color:#aaa; margin-bottom:0.5rem;">Tap a unit to see details</div>
     <div class="unit-grid" id="unit-grid"></div>
     <div class="unit-info-card" id="unit-info-card"></div>
@@ -426,7 +427,7 @@ function init() {
   }
   document.getElementById('start-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('live-date').textContent = new Date().toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'});
-  renderGrid(); renderLog(); renderMetrics();
+  renderGrid(); renderLog(); renderMetrics(); checkAlerts();
 }
 
 function switchTab(tab) {
@@ -436,7 +437,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((btn, i) => {
     btn.classList.toggle('active', ['book','dashboard','log'][i] === tab);
   });
-  if (tab === 'dashboard') { renderGrid(); renderMetrics(); renderChart(); }
+  if (tab === 'dashboard') { renderGrid(); renderMetrics(); renderChart(); checkAlerts(); }
   if (tab === 'log') renderLog();
 }
 
@@ -589,6 +590,48 @@ function submitForm() {
   saveEntry('');
   return;
   const entry = { staff, unit: parseInt(unit), action, customer: resolvedCustomer, startDate, endDate, contents, timestamp: new Date().toISOString() };
+}
+
+function checkAlerts() {
+  const container = document.getElementById('alerts-container');
+  if (!container) return;
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const alerts = [];
+
+  for (let i = 1; i <= UNITS; i++) {
+    const u = state.units[i];
+    if (!u || !u.endDate) continue;
+    const end = new Date(u.endDate);
+    end.setHours(0,0,0,0);
+    const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
+
+    if (daysLeft < 0) {
+      alerts.push({ unit: i, customer: u.customer, endDate: u.endDate, daysLeft, type: 'overdue' });
+    } else if (daysLeft <= 7) {
+      alerts.push({ unit: i, customer: u.customer, endDate: u.endDate, daysLeft, type: 'warning' });
+    }
+  }
+
+  if (alerts.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+
+  alerts.sort((a, b) => a.daysLeft - b.daysLeft);
+
+  container.innerHTML = alerts.map(a => {
+    const isOverdue = a.type === 'overdue';
+    const bg = isOverdue ? '#fdecea' : '#fff8e6';
+    const col = isOverdue ? '#8b2020' : '#7a4f00';
+    const icon = isOverdue ? '&#9888;' : '&#9201;';
+    const msg = isOverdue
+      ? 'Unit ' + a.unit + ' — <strong>' + a.customer + '</strong> is <strong>' + Math.abs(a.daysLeft) + ' day' + (Math.abs(a.daysLeft) !== 1 ? 's' : '') + ' overdue</strong> (est. end: ' + a.endDate + ')'
+      : 'Unit ' + a.unit + ' — <strong>' + a.customer + '</strong> ends in <strong>' + a.daysLeft + ' day' + (a.daysLeft !== 1 ? 's' : '') + '</strong> (' + a.endDate + ')';
+    return '<div style="background:' + bg + '; color:' + col + '; border-radius:8px; padding:10px 14px; margin-bottom:6px; font-size:13px; line-height:1.6; display:flex; align-items:flex-start; gap:8px;"><span style="font-size:15px;">' + icon + '</span><span>' + msg + '</span></div>';
+  }).join('');
+
+  container.style.display = 'block';
 }
 
 function searchCustomer() {
