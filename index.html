@@ -722,14 +722,16 @@ function showUnitInfo(i) {
   } else {
     const s = u.status === 'booking' ? 'Advance booking' : u.status === 'blocked' ? 'Block booked (indefinite)' : 'Checked in';
     const photoHtml = u.photo ? '<img src="' + u.photo + '" style="width:100%; border-radius:8px; margin-top:10px; max-height:180px; object-fit:cover;" />' : '';
+    const safeI = JSON.stringify(i);
     const actionBtn = u.status === 'booking'
-      ? '<button onclick="cancelFromDashboard('' + i + '')" style="margin-top:10px; width:100%; padding:10px; background:#8b2020; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Cancel booking</button>'
+      ? '<button onclick="cancelFromDashboard(' + safeI + ')" style="margin-top:10px; width:100%; padding:10px; background:#8b2020; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Cancel booking</button>'
       : u.status === 'blocked'
-      ? '<button onclick="cancelFromDashboard('' + i + '')" style="margin-top:10px; width:100%; padding:10px; background:#3d2a8a; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Remove block booking</button>'
-      : '<button onclick="checkoutFromDashboard('' + i + '')" style="margin-top:10px; width:100%; padding:10px; background:#1a1a1a; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Check out</button>';
-    const extendHtml = u.status === 'blocked' ? '' : '<div style="margin-top:10px; display:flex; gap:8px; align-items:center;">' +
+      ? '<button onclick="cancelFromDashboard(' + safeI + ')" style="margin-top:10px; width:100%; padding:10px; background:#3d2a8a; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Remove block booking</button>'
+      : '<button onclick="checkoutFromDashboard(' + safeI + ')" style="margin-top:10px; width:100%; padding:10px; background:#1a1a1a; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Check out</button>';
+    const extendHtml = u.status === 'blocked' ? '' :
+      '<div style="margin-top:10px; display:flex; gap:8px; align-items:center;">' +
       '<input type="date" id="extend-date-' + i + '" style="flex:1; padding:8px 10px; border:1px solid #ddd; border-radius:8px; font-size:14px;" value="' + (u.endDate || '') + '" />' +
-      '<button onclick="extendBooking(\''+i+'\')" style="padding:8px 14px; background:#2d5a0e; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;">Extend date</button>' +
+      '<button onclick="extendBooking(' + safeI + ')" style="padding:8px 14px; background:#2d5a0e; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;">Extend date</button>' +
       '</div>';
     card.innerHTML = '<strong>Unit ' + i + ' — ' + s + '</strong><br>Customer: ' + u.customer + '<br>Staff: ' + u.staff + (u.startDate ? '<br>From: ' + u.startDate : '') + (u.endDate ? '<br>Est. end: ' + u.endDate : '') + (u.contents ? '<br>Contents: ' + u.contents : '') + photoHtml + extendHtml + actionBtn;
   }
