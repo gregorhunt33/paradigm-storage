@@ -328,7 +328,7 @@
           <input type="date" id="end-date" />
         </div>
         <div class="field">
-          <label>Description of contents <span style="color:#aaa;font-weight:400;">(optional)</span></label>
+          <label>Description of contents</label>
           <input type="text" id="contents" placeholder="e.g. Living room furniture" />
         </div>
         <div class="field">
@@ -404,7 +404,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-const UNITS = 36;
+const UNITS = 37;
 let state = { units: {}, log: [] };
 try { const s = localStorage.getItem('paradigm_storage_v4'); if (s) state = JSON.parse(s); } catch(e) {}
 function save() { try { localStorage.setItem('paradigm_storage_v4', JSON.stringify(state)); } catch(e) {} }
@@ -427,9 +427,7 @@ function init() {
     o.value = i; o.textContent = 'Unit ' + i;
     unitSel.appendChild(o);
   }
-  const sofaOpt = document.createElement('option');
-  sofaOpt.value = 'sofa-rack'; sofaOpt.textContent = 'Sofa Rack';
-  unitSel.appendChild(sofaOpt);
+
   document.getElementById('start-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('live-date').textContent = new Date().toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'});
   renderGrid(); renderLog(); renderMetrics(); checkAlerts();
@@ -560,6 +558,7 @@ function submitForm() {
 
   if (!staff || !unit || !action) { toast('Please fill in all required fields.', 'error'); return; }
   if (action !== 'checkout' && !customer) { toast('Please enter the customer name.', 'error'); return; }
+  if ((action === 'checkin' || action === 'booking' || action === 'blocked') && !contents) { toast('Please enter a description of contents.', 'error'); return; }
 
   const u = state.units[unit];
   if ((action === 'checkin' || action === 'booking') && u) {
@@ -620,7 +619,6 @@ function checkAlerts() {
 
   const allUnits = [];
   for (let i = 1; i <= UNITS; i++) allUnits.push(i);
-  allUnits.push('sofa-rack');
   for (const i of allUnits) {
     const u = state.units[i];
     if (!u || !u.endDate || u.endDate === 'Indefinite') continue;
@@ -668,10 +666,7 @@ function searchCustomer() {
       matches.push({ unit: i, ...u });
     }
   }
-  const sr = state.units['sofa-rack'];
-  if (sr && sr.customer.toLowerCase().includes(query)) {
-    matches.push({ unit: 'sofa-rack', ...sr });
-  }
+
 
   if (matches.length === 0) {
     result.innerHTML = '<span style="color:#aaa;">No customer found matching “' + query + '”</span>';
